@@ -13,7 +13,7 @@ source venv/Scripts/activate
 venv/Scripts/pip install -r windows_requirements.txt
 
 # LINUX
-sudo apt install python3-tk python3-dev
+sudo apt install scrot python3-tk python3-dev
 source venv/bin/activate
 venv/bin/pip install -r linux_requirements.txt
 
