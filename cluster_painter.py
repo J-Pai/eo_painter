@@ -80,8 +80,8 @@ class ClusterPainter:
 def main():
     try:
         painter = ClusterPainter()
-        painter.set_bounderies()
-        painter.set_submit_button()
+        # painter.set_bounderies()
+        # painter.set_submit_button()
         input("Press [ENTER] when ready.")
         painter.action()
     except pyautogui.FailSafeException:
