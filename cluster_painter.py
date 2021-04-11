@@ -17,7 +17,7 @@ pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
 np.set_printoptions(threshold=sys.maxsize)
 OFFSET = 10
-IMAGE_FILEPATH = 'images/cluster_1618005314.143233.png'
+IMAGE_FILEPATH = 'images/cluster_1618005583.268798.png'
 
 class ClusterPainter:
     def __init__(self):
@@ -96,10 +96,43 @@ class ClusterPainter:
                                                 cv_image_flatten)))
         cv_image_percentage = np.vectorize(ignore_color)(cv_image_percentage)
 
+        cluster_x = []
+        cluster_y = []
+        for y in range(len(cv_image_percentage)):
+            for x in range(len(cv_image_percentage[y])):
+                pct = cv_image_percentage[y][x]
+                for j in range(pct):
+                    cluster_x.append(x)
+                    cluster_y.append(y)
+
+        plt.subplot(121)
+        cluster_plot = plt.scatter(cluster_x, cluster_y)
+        cluster_plot.axes.invert_yaxis()
+        plt.subplot(122)
         percentage_plt = plt.imshow(cv_image_percentage)
         percentage_plt.format_cursor_data = lambda data : \
             "[{}]".format(str(data))
         plt.show()
+
+        z = np.vstack((cluster_x, cluster_y)).T
+        z = np.float32(z)
+
+        criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        ret, label, center = cv.kmeans(z, 2, None, criteria, 5,
+                                       cv.KMEANS_RANDOM_CENTERS)
+        cluster_a = z[label.ravel()==0]
+        cluster_b = z[label.ravel()==1]
+
+        plt.subplot(121)
+        plt.scatter(cluster_a[:, 0], cluster_a[:, 1], c = 'b')
+        plt.scatter(cluster_b[:, 0], cluster_b[:, 1], c = 'r')
+        colored_plot = plt.scatter(center[:, 0], center[:, 1], s = 80, c = 'y',
+                                marker = 's')
+        colored_plot.axes.invert_yaxis()
+        plt.subplot(122)
+        percentage_plt = plt.imshow(cv_image_percentage)
+        plt.show()
+
         return "Done!"
 
 def main():
