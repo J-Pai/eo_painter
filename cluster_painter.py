@@ -1,19 +1,21 @@
 import argparse
-import cv2 as cv2
+import cv2 as cv
 import datetime
 import json
-import numpy
+import numpy as np
 import pyautogui
 import random
 import sys
 import time
 import os
 
+from PIL import Image
 from pynput import mouse
 from matplotlib import pyplot as plt
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
+np.set_printoptions(threshold=sys.maxsize)
 OFFSET = 10
 IMAGE_FILEPATH = 'images/cluster_1618005314.143233.png'
 
@@ -75,7 +77,30 @@ class ClusterPainter:
         print(self.submit_button)
 
     def action(self):
-        pass
+        # Ignore square dots in the corners.
+        def ignore_color(c):
+            if c <= 15:
+                return 0
+            return c
+
+        with Image.open(IMAGE_FILEPATH) as image:
+            converted_image = np.array(image.convert('RGB'))
+
+        cv_image_array = np.asarray(converted_image, dtype='uint32')
+        cv_image_flatten = (cv_image_array[:, :, 0] << 16) \
+            + (cv_image_array[:, :, 1] << 8) \
+            + (cv_image_array[:, :, 0])
+
+        cv_image_percentage = np.array(list(map(lambda c : \
+                                                np.uint32(c/0xFFFFFF*100), \
+                                                cv_image_flatten)))
+        cv_image_percentage = np.vectorize(ignore_color)(cv_image_percentage)
+
+        percentage_plt = plt.imshow(cv_image_percentage)
+        percentage_plt.format_cursor_data = lambda data : \
+            "[{}]".format(str(data))
+        plt.show()
+        return "Done!"
 
 def main():
     try:
