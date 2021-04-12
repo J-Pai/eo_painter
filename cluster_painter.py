@@ -12,12 +12,27 @@ import os
 from PIL import Image
 from pynput import mouse
 from matplotlib import pyplot as plt
+from matplotlib import cm
+
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
 np.set_printoptions(threshold=sys.maxsize)
 OFFSET = 10
 IMAGE_FILEPATH = "images/cluster_1618005814.455007.png"
+BLACK_LISTED_COLORS = {
+    0x010101,
+    0x282828,
+    0x212121,
+    0x1b1b1b,
+    0x0b0b0b,
+    0x272727,
+    0x202020,
+    0x1a1a1a,
+    0x0a0a0a,
+    0x090909,
+    0x030303,
+}
 
 class ClusterPainter:
     def __init__(self):
@@ -83,13 +98,14 @@ class ClusterPainter:
                 return 0
             return c
 
-        with Image.open("images/cluster_1618005836.973323.png") as image:
+        with Image.open("images\cluster_1618013627.190346.png") as image:
             converted_image = np.array(image.convert('RGB'))
 
         cv_image_array = np.asarray(converted_image, dtype='uint32')
         cv_image_flatten = (cv_image_array[:, :, 0] << 16) \
             + (cv_image_array[:, :, 1] << 8) \
             + (cv_image_array[:, :, 0])
+
 
         cv_image_percentage = np.array(list(map(lambda c : \
                                                 np.uint32(c/0xFFFFFF*100), \
@@ -106,33 +122,31 @@ class ClusterPainter:
                 if pct != 0:
                     cluster_x.append(x)
                     cluster_y.append(y)
-                    cluster_weight.append(1)
-
-        plt.subplot(121)
-        cluster_plot = plt.scatter(cluster_x, cluster_y)
-        cluster_plot.axes.invert_yaxis()
-        plt.subplot(122)
-        percentage_plt = plt.imshow(cv_image_percentage)
-        percentage_plt.format_cursor_data = lambda data : \
-            "[{}]".format(str(data))
-        plt.show()
+                    cluster_weight.append(pct)
 
         z = np.vstack((cluster_x, cluster_y)).T
         z = np.float32(z)
 
-        from sklearn.cluster import MiniBatchKMeans
-        model = MiniBatchKMeans(n_clusters = 2)
+        from sklearn.cluster import KMeans
+        model = KMeans(n_clusters = 8)
         clusters = model.fit_predict(z, sample_weight = cluster_weight)
         unique_clusters = np.unique(clusters)
-
-        print(unique_clusters)
+        centers = model.cluster_centers_
 
         cluster_plot = plt.subplot(121)
         for cluster in unique_clusters:
             row_index = np.where(clusters == cluster)
-            plt.scatter(z[row_index, 0], z[row_index, 1])
-            # colored_plot = plt.scatter(centers[cluster, 0], centers[cluster, 1],
-            #                            s = 80, marker = 's')
+            scatter = plt.scatter(z[row_index, 0], z[row_index, 1])
+
+        from sklearn.cluster import DBSCAN
+        center_model = DBSCAN(eps = 0.3 * len(cv_image_percentage))
+        center_clusters = center_model.fit_predict(centers)
+        unique_center_clusters = np.unique(center_clusters)
+        for cluster in unique_center_clusters:
+            row_index = np.where(center_clusters == cluster)
+            plt.scatter(centers[row_index, 0], centers[row_index, 1],
+                        s = 80, marker = 's')
+
 
         cluster_plot.axes.invert_yaxis()
         plt.subplot(122)
