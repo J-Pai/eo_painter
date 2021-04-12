@@ -10,12 +10,12 @@ py [or python3] -m venv venv
 
 # WINDOWS
 source venv/Scripts/activate
-venv/Scripts/pip install -r windows_requirements.txt
+venv/Scripts/pip install -r requirements.windows.txt
 
 # LINUX
 sudo apt install scrot python3-tk python3-dev
 source venv/bin/activate
-venv/bin/pip install -r linux_requirements.txt
+venv/bin/pip install -r requirements.linux.txt
 
 # Execution
 venv/Scripts/python cluster_painter.py
