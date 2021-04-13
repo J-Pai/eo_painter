@@ -19,7 +19,6 @@ pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
 np.set_printoptions(threshold=sys.maxsize)
 OFFSET = 10
-IMAGE_FILEPATH = "images/cluster_1618005814.455007.png"
 BLACK_LISTED_COLORS = {
     0x010101,
     0x282828,
@@ -119,7 +118,7 @@ class ClusterPainter:
         x, y = coord
         return self.x_min + x, self.y_min + y
 
-    def action(self):
+    def generate_cluster_data(self):
         # Ignore square dots in the corners.
         def ignore_color(c):
             if c in BLACK_LISTED_COLORS:
@@ -134,7 +133,6 @@ class ClusterPainter:
                 return 0
             value = (r / 255 + 2) + (g / 255 + 1) + b / 255
             return np.uint32(value / 3 * 100)
-
         # with Image.open(self.screenshot()) as image:
         # with Image.open("images\cluster_1618287905.126905.png") as image:
             # converted_image = np.array(image.convert('RGB'))
@@ -163,19 +161,36 @@ class ClusterPainter:
         z = np.vstack((cluster_x, cluster_y)).T
         z = np.float32(z)
 
+        # plt.subplot(222)
+        # percentage_plt = plt.imshow(cv_image_percentage)
+
+        # plt.subplot(223)
+        # flatten_plt = plt.imshow(cv_image_flatten)
+        # flatten_plt.format_cursor_data = lambda data : \
+        #      "[{}]".format(hex(data))
+
+        # plt.subplot(224)
+        # plt.imshow(converted_image)
+
+        return z, cluster_weight, len(cv_image_percentage[0]), len(cv_image_percentage)
+
+    def execute_clustering(self):
+        z, cluster_weight, max_x, max_y = self.generate_cluster_data()
+
         from sklearn.cluster import KMeans
         model = KMeans(n_clusters = 2)
         clusters = model.fit_predict(z, sample_weight = cluster_weight)
         unique_clusters = np.unique(clusters)
         centers = model.cluster_centers_
 
-        cluster_plot = plt.subplot(221)
+        # cluster_plot = plt.subplot(221)
+        # cluster_plot.axes.invert_yaxis()
         centers_associations = {}
         for cluster in unique_clusters:
             row_index = np.where(clusters == cluster)
-            # scatter = plt.scatter(z[row_index, 0], z[row_index, 1])
             x, y = centers[cluster]
             centers_associations[(x, y)] = z[row_index]
+            # plt.scatter(z[row_index, 0], z[row_index, 1])
 
         from sklearn.cluster import MeanShift
         center_model = MeanShift()
@@ -192,16 +207,15 @@ class ClusterPainter:
                     points = centers_associations[(x, y)]
                 else:
                     points = np.append(points, centers_associations[(x, y)], axis = 0)
-            scatter = plt.scatter(points[:, 0], points[:, 1])
-            plt.scatter(centers[row_index, 0], centers[row_index, 1],
-                        s = 80, marker = 's')
             main_centers.append([np.mean(points[:, 0]), np.mean(points[:, 1])])
-            plt.scatter(main_centers[cluster][0], main_centers[cluster][1], marker = 'D')
+            # plt.scatter(points[:, 0], points[:, 1])
+            # plt.scatter(centers[row_index, 0], centers[row_index, 1],
+            #            s = 80, marker = 's')
+            # plt.scatter(main_centers[cluster][0], main_centers[cluster][1], marker = 'D')
 
-        bisectors = None
-        max_x = len(cv_image_percentage[0])
-        max_y = len(cv_image_percentage)
-        bisectors = []
+        return main_centers, max_x, max_y
+
+    def compute_edge_points(self, main_centers, max_x, max_y):
         top_edge = -1
         right_edge = -1
         bottom_edge = -1
@@ -241,59 +255,64 @@ class ClusterPainter:
                         points.append([0, y_zero])
 
                     np_points = np.array(points)
-                    plt.plot(np_points[:, 0], np_points[:, 1], '--', linewidth = 2)
-                    bisectors.append(np_points)
+                    # plt.plot(np_points[:, 0], np_points[:, 1], '--', linewidth = 2)
 
-        bisectors = np.array(bisectors)
+        # plt.show()
+        return top_edge, right_edge, bottom_edge, left_edge
 
-        cluster_plot.axes.invert_yaxis()
-        plt.subplot(222)
-        percentage_plt = plt.imshow(cv_image_percentage)
+    def action(self):
+        while True:
+            centers, max_x, max_y = self.execute_clustering()
+            top_edge, right_edge, bottom_edge, left_edge = self.compute_edge_points(
+                centers, max_x, max_y)
 
-        plt.subplot(223)
-        flatten_plt = plt.imshow(cv_image_flatten)
-        flatten_plt.format_cursor_data = lambda data : \
-             "[{}]".format(hex(data))
-
-        plt.subplot(224)
-        plt.imshow(converted_image)
-
-        plt.show()
-
-        print(top_edge, right_edge, bottom_edge, left_edge)
-
-        shapes = []
-        shapes.append([0, 0])
-        if top_edge != -1:
-            shapes.append([top_edge, 0])
-            shapes.append([bottom_edge, max_y])
-            shapes.append([0, max_y])
+            shapes = []
             shapes.append([0, 0])
+            if top_edge != -1:
+                shapes.append([top_edge, 0])
+                shapes.append([bottom_edge, max_y])
+                shapes.append([0, max_y])
+                shapes.append([0, 0])
 
-            shapes.append([top_edge + 15, 0])
-            shapes.append([max_x, 0])
-            shapes.append([max_x, max_y])
-            shapes.append([bottom_edge + 15, max_y])
-            shapes.append([top_edge + 15, 0])
-        else:
-            shapes.append([max_x, 0])
-            shapes.append([max_x, right_edge])
-            shapes.append([0 ,left_edge])
-            shapes.append([0, 0])
+                shapes.append([top_edge + 15, 0])
+                shapes.append([max_x, 0])
+                shapes.append([max_x, max_y])
+                shapes.append([bottom_edge + 15, max_y])
+                shapes.append([top_edge + 15, 0])
+            else:
+                shapes.append([max_x, 0])
+                shapes.append([max_x, right_edge])
+                shapes.append([0 ,left_edge])
+                shapes.append([0, 0])
 
-            shapes.append([0, left_edge + 15])
-            shapes.append([max_x, right_edge + 15])
-            shapes.append([max_x, max_y])
-            shapes.append([0, max_y])
-            shapes.append([0, left_edge + 15])
+                shapes.append([0, left_edge + 15])
+                shapes.append([max_x, right_edge + 15])
+                shapes.append([max_x, max_y])
+                shapes.append([0, max_y])
+                shapes.append([0, left_edge + 15])
 
-        print(shapes)
+            for coordinates in shapes:
+                x, y = self.transform_cluster_coord(coordinates)
+                pyautogui.moveTo(x, y)
+                print("RECT 1 Moved mouse to: ({}, {})".format(x, y))
+                pyautogui.click()
 
-        for coordinates in shapes:
-            x, y = self.transform_cluster_coord(coordinates)
-            pyautogui.moveTo(x, y)
-            print("RECT 1 Moved mouse to: ({}, {})".format(x, y))
+            # Submit entry and click through UI to get next puzzle.
+            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
             pyautogui.click()
+            time.sleep(1)
+            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
+            pyautogui.click()
+            time.sleep(1)
+            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
+            pyautogui.click()
+
+            # Wait until UI is ready before starting next iteration.
+            continue_button = None
+            while not continue_button:
+                continue_button = pyautogui.locateOnScreen(
+                    'ui_targets/submit_button.png', confidence=0.5)
+                time.sleep(1)
 
         return "Done!"
 
