@@ -32,6 +32,7 @@ BLACK_LISTED_COLORS = {
     0x0a0a0a,
     0x090909,
     0x030303,
+    0x080808,
 }
 
 class ClusterPainter:
@@ -94,23 +95,34 @@ class ClusterPainter:
     def action(self):
         # Ignore square dots in the corners.
         def ignore_color(c):
-            if c <= 15:
+            if c in BLACK_LISTED_COLORS:
                 return 0
             return c
 
-        with Image.open("images\cluster_1618013627.190346.png") as image:
+        def heat_map_percentage(c):
+            r = (c >> 16) & 0xFF;
+            g = (c >> 8) & 0xFF;
+            b = c & 0xFF;
+            if r == 0 and g == 0 and b == 0:
+                return 0
+            value = (r / 255 + 2) + (g / 255 + 1) + b / 255
+            return np.uint32(value / 3 * 100)
+
+        with Image.open("images\cluster_1618013587.160562.png") as image:
             converted_image = np.array(image.convert('RGB'))
 
         cv_image_array = np.asarray(converted_image, dtype='uint32')
         cv_image_flatten = (cv_image_array[:, :, 0] << 16) \
             + (cv_image_array[:, :, 1] << 8) \
             + (cv_image_array[:, :, 0])
+        cv_image_flatten = np.vectorize(ignore_color)(cv_image_flatten)
 
+        # flatten_plt = plt.imshow(cv_image_flatten)
+        # flatten_plt.format_cursor_data = lambda data : \
+        #     "[{}]".format(hex(data))
+        # plt.show()
 
-        cv_image_percentage = np.array(list(map(lambda c : \
-                                                np.uint32(c/0xFFFFFF*100), \
-                                                cv_image_flatten)))
-        cv_image_percentage = np.vectorize(ignore_color)(cv_image_percentage)
+        cv_image_percentage = np.vectorize(heat_map_percentage)(cv_image_flatten)
 
         cluster_x = []
         cluster_y = []
@@ -128,12 +140,12 @@ class ClusterPainter:
         z = np.float32(z)
 
         from sklearn.cluster import KMeans
-        model = KMeans(n_clusters = 8)
+        model = KMeans()
         clusters = model.fit_predict(z, sample_weight = cluster_weight)
         unique_clusters = np.unique(clusters)
         centers = model.cluster_centers_
 
-        cluster_plot = plt.subplot(121)
+        cluster_plot = plt.subplot(141)
         for cluster in unique_clusters:
             row_index = np.where(clusters == cluster)
             scatter = plt.scatter(z[row_index, 0], z[row_index, 1])
@@ -149,8 +161,17 @@ class ClusterPainter:
 
 
         cluster_plot.axes.invert_yaxis()
-        plt.subplot(122)
+        plt.subplot(142)
         percentage_plt = plt.imshow(cv_image_percentage)
+
+        plt.subplot(143)
+        flatten_plt = plt.imshow(cv_image_flatten)
+        flatten_plt.format_cursor_data = lambda data : \
+             "[{}]".format(hex(data))
+
+        plt.subplot(144)
+        plt.imshow(converted_image)
+
         plt.show()
 
         return "Done!"
