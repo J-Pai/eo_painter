@@ -18,7 +18,9 @@ from matplotlib import cm
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
 np.set_printoptions(threshold=sys.maxsize)
-OFFSET = 10
+OFFSET = 15
+RANDOM_RANGE = 50
+
 BLACK_LISTED_COLORS = {
     0x010101,
     0x282828,
@@ -81,7 +83,7 @@ class ClusterPainter:
             return False
 
     def set_bounderies(self):
-        if self.sim is not None:
+        if self.sim is not None and len(self.sim) != 0:
             return
         print('SET BOUNDARY : top_left')
         with mouse.Listener(on_click=self.on_click) as listener:
@@ -96,7 +98,7 @@ class ClusterPainter:
                     self.x_min, self.y_min, self.x_max, self.y_max,))
 
     def set_submit_button(self):
-        if self.sim is not None:
+        if self.sim is not None and len(self.sim) != 0:
             return
         print('SET CONTINUE BUTTON')
         submit_button = pyautogui.locateOnScreen(
@@ -145,8 +147,7 @@ class ClusterPainter:
             with Image.open(self.sim[0]) as image:
                 converted_image = np.array(image.convert('RGB'))
         elif self.sim is not None:
-            with Image.open(self.screenshot()) as image:
-                converted_image = np.array(image.convert('RGB'))
+            converted_image = np.array(self.screenshot().convert('RGB'))
         else:
             converted_image = np.array(self.screenshot().convert('RGB'))
 
@@ -168,8 +169,6 @@ class ClusterPainter:
                     cluster_x.append(x)
                     cluster_y.append(y)
                     cluster_weight.append(pct)
-
-        print("Done setting up data.")
 
         z = np.vstack((cluster_x, cluster_y)).T
         z = np.float32(z)
@@ -288,29 +287,48 @@ class ClusterPainter:
                 break
 
             shapes = []
-            shapes.append([0, 0])
+            shapes.append([
+                0 + random.randint(0, RANDOM_RANGE),
+                0 + random.randint(0, RANDOM_RANGE)])
             if top_edge != -1:
-                shapes.append([top_edge, 0])
-                shapes.append([bottom_edge, max_y])
-                shapes.append([0, max_y])
-                shapes.append([0, 0])
+                shapes.append([
+                    top_edge + random.randint(0, RANDOM_RANGE),
+                    0 + random.randint(0, RANDOM_RANGE)])
+                shapes.append([
+                    bottom_edge - random.randint(0, RANDOM_RANGE),
+                    max_y - random.randint(0, RANDOM_RANGE)])
+                shapes.append([
+                    0 + random.randint(0, RANDOM_RANGE),
+                    max_y - random.randint(0, RANDOM_RANGE)])
+                shapes.append(shapes[0])
 
-                shapes.append([top_edge + 15, 0])
+                shapes.append([
+                    shapes[1][0] + OFFSET, 0])
                 shapes.append([max_x, 0])
                 shapes.append([max_x, max_y])
-                shapes.append([bottom_edge + 15, max_y])
-                shapes.append([top_edge + 15, 0])
+                shapes.append([shapes[3][0] + OFFSET, max_y])
+                shapes.append(shapes[5])
             else:
-                shapes.append([max_x, 0])
-                shapes.append([max_x, right_edge])
-                shapes.append([0 ,left_edge])
-                shapes.append([0, 0])
+                shapes.append([
+                    max_x - random.randint(0, RANDOM_RANGE),
+                    0 + random.randint(0, RANDOM_RANGE)])
+                shapes.append([
+                    max_x - random.randint(0, RANDOM_RANGE),
+                    right_edge - random.randint(0, RANDOM_RANGE)])
+                shapes.append([
+                    0 + random.randint(0, RANDOM_RANGE) ,
+                    left_edge + random.randint(0, RANDOM_RANGE)])
+                shapes.append(shapes[0])
 
-                shapes.append([0, left_edge + 15])
-                shapes.append([max_x, right_edge + 15])
-                shapes.append([max_x, max_y])
-                shapes.append([0, max_y])
-                shapes.append([0, left_edge + 15])
+                shapes.append([0, shapes[3][1] + OFFSET])
+                shapes.append([shapes[2][0], shapes[2][1] + OFFSET])
+                shapes.append([
+                    max_x - random.randint(0, RANDOM_RANGE),
+                    max_y - random.randint(0, RANDOM_RANGE)])
+                shapes.append([
+                    0 + random.randint(0, RANDOM_RANGE),
+                    max_y - random.randint(0, RANDOM_RANGE)])
+                shapes.append(shapes[5])
 
             for coordinates in shapes:
                 x, y = self.transform_cluster_coord(coordinates)
