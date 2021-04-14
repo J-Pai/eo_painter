@@ -81,7 +81,7 @@ class ClusterPainter:
             return False
 
     def set_bounderies(self):
-        if self.sim:
+        if self.sim is not None:
             return
         print('SET BOUNDARY : top_left')
         with mouse.Listener(on_click=self.on_click) as listener:
@@ -96,7 +96,7 @@ class ClusterPainter:
                     self.x_min, self.y_min, self.x_max, self.y_max,))
 
     def set_submit_button(self):
-        if self.sim:
+        if self.sim is not None:
             return
         print('SET CONTINUE BUTTON')
         submit_button = pyautogui.locateOnScreen(
@@ -113,7 +113,7 @@ class ClusterPainter:
             self.x_max - self.x_min,
             self.y_max - self.y_min,
         ))
-        if self.plot_enable and not self.sim:
+        if self.plot_enable and self.sim is not None:
             image_name = 'cluster_{}.png'.format(datetime.datetime.now().timestamp())
             image_path = 'images/{}'.format(image_name)
             image.save(image_path)
@@ -141,9 +141,11 @@ class ClusterPainter:
             return b
 
         converted_image = None
-        if self.sim:
-            #with Image.open(self.screenshot()) as image:
+        if self.sim is not None and len(self.sim) != 0:
             with Image.open(self.sim[0]) as image:
+                converted_image = np.array(image.convert('RGB'))
+        elif self.sim is not None:
+            with Image.open(self.screenshot()) as image:
                 converted_image = np.array(image.convert('RGB'))
         else:
             converted_image = np.array(self.screenshot().convert('RGB'))
@@ -282,7 +284,7 @@ class ClusterPainter:
             top_edge, right_edge, bottom_edge, left_edge = self.compute_edge_points(
                 centers, max_x, max_y)
 
-            if self.sim:
+            if self.sim is not None and len(self.sim) != 0:
                 break
 
             shapes = []
@@ -316,6 +318,9 @@ class ClusterPainter:
                 print('RECT 1 Moved mouse to: ({}, {})'.format(x, y))
                 pyautogui.click()
 
+            if self.sim is not None and len(self.sim) == 0:
+                break
+
             # Submit entry and click through UI to get next puzzle.
             pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
             pyautogui.click()
@@ -339,8 +344,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--plot', action = 'store_true',
         help = "generate analysis plot prior to doing automated action")
-    parser.add_argument('-s', '--simulate', type = str,
-            nargs = 1,
+    parser.add_argument('-s', '--simulate', type = str, nargs = '*',
             help = "simulate analysis of passed in image")
     args = parser.parse_args()
 
