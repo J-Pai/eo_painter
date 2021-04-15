@@ -247,6 +247,24 @@ class ClusterPainter:
 
         return centers, max_x, max_y
 
+    def generate_edge_to_edge_line(self, slope, b, max_x, max_y):
+        y_edge = slope * max_x + b;
+        y_zero = b
+
+        x_edge = (max_y - b) / slope
+        x_zero = -b / slope
+
+        points = []
+        if x_edge >= 0 and x_edge <= max_x:
+            points.append([x_edge, max_y])
+        if x_zero >= 0 and x_zero <= max_x:
+            points.append([x_zero, 0])
+        if y_edge >= 0 and y_edge <= max_y:
+            points.append([max_x, y_edge])
+        if y_zero >= 0 and y_zero <= max_y:
+            points.append([0, y_zero])
+        return points
+
     def compute_edge_points(self, main_centers, max_x, max_y):
         main_divider = None
         slope = None
@@ -265,23 +283,9 @@ class ClusterPainter:
                     slope = -1 / s
                     b = y_mid - slope * x_mid
 
-                    y_edge = slope * max_x + b;
-                    y_zero = b
+                    main_divider = np.array(self.generate_edge_to_edge_line(
+                        slope, b, max_x, max_y))
 
-                    x_edge = (max_y - b) / slope
-                    x_zero = -b / slope
-
-                    points = []
-                    if x_edge >= 0 and x_edge <= max_x:
-                        points.append([x_edge, max_y])
-                    if x_zero >= 0 and x_zero <= max_x:
-                        points.append([x_zero, 0])
-                    if y_edge >= 0 and y_edge <= max_y:
-                        points.append([max_x, y_edge])
-                    if y_zero >= 0 and y_zero <= max_y:
-                        points.append([0, y_zero])
-
-                    main_divider = np.array(points)
                     if self.plot_enable:
                         plt.plot(main_divider[:, 0], main_divider[:, 1], '--', linewidth = 2)
 
@@ -309,26 +313,22 @@ class ClusterPainter:
                 shapes.append([random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE)])
                 shapes.append(shapes[0])
             else:
-                if divider[0][1] < divider[1][1]:
-                    x1, y1 = divider[0]
-                    x2, y2 = divider[1]
-                else:
-                    x1, y1 = divider[1]
-                    x2, y2 = divider[0]
-
-                higher_point = (x1, y1)
-                lower_point = (x2, y2)
-                higher_point_1 = (x1 + 15, y1 - 15)
-                lower_point_1 = (x2 + 15, y2 - 15)
+                x1, y1 = divider[0]
+                x2, y2 = divider[1]
                 top_left = (random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
                 top_right = (max_x - random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
                 bottom_right = (max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
                 bottom_left = (random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
 
-                points = [top_left, top_right, bottom_right, bottom_left]
+                line1 = self.generate_edge_to_edge_line(slope, b + 7.5, max_x, max_y)
+                line2 = self.generate_edge_to_edge_line(slope, b - 7.5, max_x, max_y)
 
-                bucket_1 = [higher_point, lower_point]
-                bucket_2 = [higher_point_1, lower_point_1]
+                points = [top_left, top_right, bottom_right, bottom_left]
+                points.extend(line1)
+                points.extend(line2)
+
+                bucket_1 = []
+                bucket_2 = []
 
                 for x, y in points:
                     d = (x - x1) * (y2 - y1) - (y - y1) * (x2 -x1)
