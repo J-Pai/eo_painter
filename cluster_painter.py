@@ -8,6 +8,7 @@ import random
 import sys
 import time
 import os
+import math
 
 from PIL import Image
 from pynput import mouse
@@ -115,7 +116,7 @@ class ClusterPainter:
             self.x_max - self.x_min,
             self.y_max - self.y_min,
         ))
-        if self.plot_enable and self.sim is not None:
+        if self.plot_enable and self.sim is None:
             image_name = 'cluster_{}.png'.format(datetime.datetime.now().timestamp())
             image_path = 'images/{}'.format(image_name)
             image.save(image_path)
@@ -136,11 +137,21 @@ class ClusterPainter:
             r = (c >> 16) & 0xFF;
             g = (c >> 8) & 0xFF;
             b = c & 0xFF;
-
             if r == 0 and g == 0 and b == 0:
                 return 0
+            brightness_1 = b
+            brightness_2 = r
+            return max(brightness_1, brightness_2)
 
-            return b
+        mean = None
+        median = None
+        max_pct = None
+        min_pct = None
+
+        def cleanup_heat_map(pct):
+            if pct < mean:
+                return 0
+            return pct
 
         converted_image = None
         if self.sim is not None and len(self.sim) != 0:
@@ -157,6 +168,23 @@ class ClusterPainter:
             + (cv_image_array[:, :, 2])
         cv_image_flatten = np.vectorize(ignore_color)(cv_image_flatten)
         cv_image_percentage = np.vectorize(heat_map_percentage)(cv_image_flatten)
+
+        if self.plot_enable:
+            plt.subplot(223)
+            flatten_plt = plt.imshow(cv_image_percentage)
+            flatten_plt.format_cursor_data = lambda data : \
+                '[{}]'.format(data)
+
+        cv_image_data = np.array(cv_image_percentage.flatten(), dtype = float)
+        cv_image_data[cv_image_data == 0] = np.nan
+        mean = np.nanmean(cv_image_data)
+        median = np.nanmedian(cv_image_data)
+        max_pct = np.nanmax(cv_image_data)
+        min_pct = np.nanmin(cv_image_data)
+        print(mean, median, max_pct, min_pct)
+
+        cv_image_percentage = np.vectorize(cleanup_heat_map)(cv_image_percentage)
+
 
         cluster_x = []
         cluster_y = []
@@ -177,11 +205,6 @@ class ClusterPainter:
             plt.subplot(222)
             percentage_plt = plt.imshow(cv_image_percentage)
 
-            plt.subplot(223)
-            flatten_plt = plt.imshow(cv_image_flatten)
-            flatten_plt.format_cursor_data = lambda data : \
-                '[{}]'.format(hex(data))
-
             plt.subplot(224)
             plt.imshow(converted_image)
 
@@ -190,52 +213,44 @@ class ClusterPainter:
     def execute_clustering(self):
         z, cluster_weight, max_x, max_y = self.generate_cluster_data()
 
-        from sklearn.cluster import KMeans
-        model = KMeans(n_clusters = 2)
+        import hdbscan
+        model = hdbscan.HDBSCAN(min_cluster_size = 30, allow_single_cluster = True)
         clusters = model.fit_predict(z) # sample_weight = cluster_weight)
-        unique_clusters = np.unique(clusters)
-        centers = model.cluster_centers_
+        unique_clusters, counts = np.unique(clusters, return_counts = True)
 
         if self.plot_enable:
             cluster_plot = plt.subplot(221)
             cluster_plot.axes.invert_yaxis()
+
         centers_associations = {}
-        for cluster in unique_clusters:
+        centers = []
+        cluster_counts = dict(zip(unique_clusters, counts))
+
+        sorted_unique_clusters = sorted(unique_clusters, key = lambda x : -cluster_counts[x])
+        print(sorted_unique_clusters)
+
+        count = 0
+        for cluster in sorted_unique_clusters:
             row_index = np.where(clusters == cluster)
-            x, y = centers[cluster]
+            if count >= 2:
+                break
+            if len(clusters) > 2 and cluster == -1:
+                plt.scatter(z[row_index, 0], z[row_index, 1])
+                continue
+            x = np.mean(z[row_index, 0])
+            y = np.mean(z[row_index, 1])
+            centers.append((x, y))
             centers_associations[(x, y)] = z[row_index]
             if self.plot_enable:
                 plt.scatter(z[row_index, 0], z[row_index, 1])
+            count += 1
 
-        from sklearn.cluster import MeanShift
-        center_model = MeanShift()
-        center_clusters = center_model.fit_predict(centers)
-        unique_center_clusters = np.unique(center_clusters)
-
-        main_centers = []
-        scatter = None
-        for cluster in unique_center_clusters:
-            row_index = np.where(center_clusters == cluster)
-            points = []
-            for x, y in centers[row_index]:
-                if len(points) == 0:
-                    points = centers_associations[(x, y)]
-                else:
-                    points = np.append(points, centers_associations[(x, y)], axis = 0)
-            main_centers.append([np.mean(points[:, 0]), np.mean(points[:, 1])])
-            if self.plot_enable:
-                plt.scatter(points[:, 0], points[:, 1])
-                plt.scatter(centers[row_index, 0], centers[row_index, 1],
-                        s = 80, marker = 's')
-                plt.scatter(main_centers[cluster][0], main_centers[cluster][1], marker = 'D')
-
-        return main_centers, max_x, max_y
+        return centers, max_x, max_y
 
     def compute_edge_points(self, main_centers, max_x, max_y):
-        top_edge = -1
-        right_edge = -1
-        bottom_edge = -1
-        left_edge = -1
+        main_divider = None
+        slope = None
+        b = None
         for c in main_centers:
             for other_c in main_centers:
                 if c != other_c:
@@ -245,91 +260,97 @@ class ClusterPainter:
                     x_mid = (x_1 + x_2) / 2
                     y_mid = (y_1 + y_2) / 2
 
-                    slope = (y_2 - y_1) / (x_2 - x_1)
+                    s = (y_2 - y_1) / (x_2 - x_1)
 
-                    perp_slope = -1 / slope
-                    b = y_mid - perp_slope * x_mid
+                    slope = -1 / s
+                    b = y_mid - slope * x_mid
 
-                    y_edge = perp_slope * max_x + b;
+                    y_edge = slope * max_x + b;
                     y_zero = b
 
-                    x_edge = (max_y - b) / perp_slope
-                    x_zero = -b / perp_slope
+                    x_edge = (max_y - b) / slope
+                    x_zero = -b / slope
 
                     points = []
                     if x_edge >= 0 and x_edge <= max_x:
-                        bottom_edge = x_edge
                         points.append([x_edge, max_y])
                     if x_zero >= 0 and x_zero <= max_x:
-                        top_edge = x_zero
                         points.append([x_zero, 0])
                     if y_edge >= 0 and y_edge <= max_y:
-                        right_edge = y_edge
                         points.append([max_x, y_edge])
                     if y_zero >= 0 and y_zero <= max_y:
-                        left_edge = y_zero
                         points.append([0, y_zero])
 
-                    np_points = np.array(points)
+                    main_divider = np.array(points)
                     if self.plot_enable:
-                        plt.plot(np_points[:, 0], np_points[:, 1], '--', linewidth = 2)
-        if self.plot_enable:
-            plt.show()
-        return top_edge, right_edge, bottom_edge, left_edge
+                        plt.plot(main_divider[:, 0], main_divider[:, 1], '--', linewidth = 2)
+
+        return main_divider, slope, b
 
     def action(self):
         while True:
             centers, max_x, max_y = self.execute_clustering()
-            top_edge, right_edge, bottom_edge, left_edge = self.compute_edge_points(
+            divider, slope, b = self.compute_edge_points(
                 centers, max_x, max_y)
+
+            print(divider, slope, b)
+
+            if self.plot_enable:
+                plt.show()
 
             if self.sim is not None and len(self.sim) != 0:
                 break
 
             shapes = []
-            shapes.append([
-                0 + random.randint(0, RANDOM_RANGE),
-                0 + random.randint(0, RANDOM_RANGE)])
-            if top_edge != -1:
-                shapes.append([
-                    top_edge + random.randint(0, RANDOM_RANGE),
-                    0 + random.randint(0, RANDOM_RANGE)])
-                shapes.append([
-                    bottom_edge - random.randint(0, RANDOM_RANGE),
-                    max_y - random.randint(0, RANDOM_RANGE)])
-                shapes.append([
-                    0 + random.randint(0, RANDOM_RANGE),
-                    max_y - random.randint(0, RANDOM_RANGE)])
+            if divider is None:
+                shapes.append([random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE)])
+                shapes.append([max_x - random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE)])
+                shapes.append([max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE)])
+                shapes.append([random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE)])
                 shapes.append(shapes[0])
-
-                shapes.append([
-                    shapes[1][0] + OFFSET, 0])
-                shapes.append([max_x, 0])
-                shapes.append([max_x, max_y])
-                shapes.append([shapes[3][0] + OFFSET, max_y])
-                shapes.append(shapes[5])
             else:
-                shapes.append([
-                    max_x - random.randint(0, RANDOM_RANGE),
-                    0 + random.randint(0, RANDOM_RANGE)])
-                shapes.append([
-                    max_x - random.randint(0, RANDOM_RANGE),
-                    right_edge - random.randint(0, RANDOM_RANGE)])
-                shapes.append([
-                    0 + random.randint(0, RANDOM_RANGE) ,
-                    left_edge + random.randint(0, RANDOM_RANGE)])
-                shapes.append(shapes[0])
+                if divider[0][1] < divider[1][1]:
+                    x1, y1 = divider[0]
+                    x2, y2 = divider[1]
+                else:
+                    x1, y1 = divider[1]
+                    x2, y2 = divider[0]
 
-                shapes.append([0, shapes[3][1] + OFFSET])
-                shapes.append([shapes[2][0], shapes[2][1] + OFFSET])
-                shapes.append([
-                    max_x - random.randint(0, RANDOM_RANGE),
-                    max_y - random.randint(0, RANDOM_RANGE)])
-                shapes.append([
-                    0 + random.randint(0, RANDOM_RANGE),
-                    max_y - random.randint(0, RANDOM_RANGE)])
-                shapes.append(shapes[5])
+                higher_point = (x1, y1)
+                lower_point = (x2, y2)
+                higher_point_1 = (x1 + 15, y1 - 15)
+                lower_point_1 = (x2 + 15, y2 - 15)
+                top_left = (random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
+                top_right = (max_x - random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
+                bottom_right = (max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
+                bottom_left = (random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
 
+                points = [top_left, top_right, bottom_right, bottom_left]
+
+                bucket_1 = [higher_point, lower_point]
+                bucket_2 = [higher_point_1, lower_point_1]
+
+                for x, y in points:
+                    d = (x - x1) * (y2 - y1) - (y - y1) * (x2 -x1)
+                    if d < 0:
+                        bucket_1.append((x, y))
+                    else:
+                        bucket_2.append((x, y))
+
+                cx = max_x / 2
+                cy = max_y / 2
+
+                def compare(x):
+                    return math.atan2(x[0] - cx, x[1] - cy)
+
+                bucket_1 = sorted(bucket_1, key = compare)
+                bucket_2 = sorted(bucket_2, key = compare)
+                shapes.extend(bucket_1)
+                shapes.append(bucket_1[0])
+                shapes.extend(bucket_2)
+                shapes.append(bucket_2[0])
+
+            count = 0
             for coordinates in shapes:
                 x, y = self.transform_cluster_coord(coordinates)
                 pyautogui.moveTo(x, y)
@@ -337,7 +358,8 @@ class ClusterPainter:
                 pyautogui.click()
 
             if self.sim is not None and len(self.sim) == 0:
-                break
+                input('Press [ENTER] when ready.')
+                continue
 
             # Submit entry and click through UI to get next puzzle.
             pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
