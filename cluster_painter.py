@@ -321,7 +321,7 @@ class ClusterPainter:
                 bottom_right = (max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
                 bottom_left = (random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
 
-                offset = (15 * slope) / 2
+                offset = math.abs((15 * slope) / 2)
 
                 line1 = self.generate_edge_to_edge_line(slope, b + offset, max_x, max_y)
                 line2 = self.generate_edge_to_edge_line(slope, b - offset, max_x, max_y)
