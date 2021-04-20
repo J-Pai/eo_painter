@@ -15,6 +15,9 @@ from pynput import mouse
 from matplotlib import pyplot as plt
 from matplotlib import cm
 
+from PIL import ImageGrab
+from functools import partial
+ImageGrab.grab = partial(ImageGrab.grab, all_screens=True)
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
@@ -106,7 +109,7 @@ class ClusterPainter:
             return
         print('SET CONTINUE BUTTON')
         submit_button = pyautogui.locateOnScreen(
-            'ui_targets/submit_button.png', confidence=0.5)
+            'ui_targets/submit_button_smaller.png', confidence=0.5)
         if not submit_button:
             raise ValueError('[Submit] Button not found.')
         self.submit_button = pyautogui.center(submit_button)
@@ -366,20 +369,26 @@ class ClusterPainter:
                 continue
 
             # Submit entry and click through UI to get next puzzle.
-            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
+            pyautogui.moveTo(
+                self.submit_button[0] + random.randint(-50, 50),
+                self.submit_button[1] + random.randint(-20, 20))
             pyautogui.click()
             time.sleep(1)
-            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
+            pyautogui.moveTo(
+                self.submit_button[0] + random.randint(-50, 50),
+                self.submit_button[1] + random.randint(-20, 20))
             pyautogui.click()
             time.sleep(1)
-            pyautogui.moveTo(self.submit_button[0], self.submit_button[1])
+            pyautogui.moveTo(
+                self.submit_button[0] + random.randint(-50, 50),
+                self.submit_button[1] + random.randint(-20, 20))
             pyautogui.click()
 
             # Wait until UI is ready before starting next iteration.
             continue_button = None
             while not continue_button:
                 continue_button = pyautogui.locateOnScreen(
-                    'ui_targets/submit_button.png', confidence=0.5)
+                    'ui_targets/submit_button_smaller.png', confidence=0.5)
                 time.sleep(1)
 
         return 'Done!'
