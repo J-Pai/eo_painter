@@ -48,6 +48,9 @@ BLACK_LISTED_COLORS = {
     0x10001,
 }
 
+def rgb(r, g, b):
+    return (r << 16) + (g << 8) + (b)
+
 class ClusterPainter:
     def __init__(self, plot_enable, sim):
         screen_width, screen_height = pyautogui.size()
@@ -139,9 +142,8 @@ class ClusterPainter:
             b = c & 0xFF;
             if r == 0 and g == 0 and b == 0:
                 return 0
-            brightness_1 = b
-            brightness_2 = r
-            return max(brightness_1, brightness_2)
+            pct = int((r - 255) / -255 * 100)
+            return pct
 
         mean = None
         median = None
@@ -171,9 +173,9 @@ class ClusterPainter:
 
         if self.plot_enable:
             plt.subplot(223)
-            flatten_plt = plt.imshow(cv_image_percentage)
+            flatten_plt = plt.imshow(cv_image_flatten)
             flatten_plt.format_cursor_data = lambda data : \
-                '[{}]'.format(data)
+                '[{}]'.format(hex(data))
 
         cv_image_data = np.array(cv_image_percentage.flatten(), dtype = float)
         cv_image_data[cv_image_data == 0] = np.nan
@@ -184,7 +186,6 @@ class ClusterPainter:
         print(mean, median, max_pct, min_pct)
 
         cv_image_percentage = np.vectorize(cleanup_heat_map)(cv_image_percentage)
-
 
         cluster_x = []
         cluster_y = []
@@ -320,8 +321,10 @@ class ClusterPainter:
                 bottom_right = (max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
                 bottom_left = (random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
 
-                line1 = self.generate_edge_to_edge_line(slope, b + 7.5, max_x, max_y)
-                line2 = self.generate_edge_to_edge_line(slope, b - 7.5, max_x, max_y)
+                offset = (15 * slope) / 2
+
+                line1 = self.generate_edge_to_edge_line(slope, b + offset, max_x, max_y)
+                line2 = self.generate_edge_to_edge_line(slope, b - offset, max_x, max_y)
 
                 points = [top_left, top_right, bottom_right, bottom_left]
                 points.extend(line1)
