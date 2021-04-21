@@ -321,7 +321,7 @@ class ClusterPainter:
                 x2, y2 = divider[1]
                 top_left = (random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
                 top_right = (max_x - random.randint(0, RANDOM_RANGE), random.randint(0, RANDOM_RANGE))
-                bottom_right = (max_x - random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
+                bottom_right = (max_x, max_y)
                 bottom_left = (random.randint(0, RANDOM_RANGE), max_y - random.randint(0, RANDOM_RANGE))
 
                 offset = abs(math.sqrt((15 * slope) ** 2 + 15 ** 2)) / 2
