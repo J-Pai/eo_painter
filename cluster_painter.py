@@ -143,7 +143,7 @@ class ClusterPainter:
             r = (c >> 16) & 0xFF;
             g = (c >> 8) & 0xFF;
             b = c & 0xFF;
-            if r == 0 and g == 0 and b == 0:
+            if r < 10:
                 return 0
             pct = int((r - 255) / -255 * 100)
             return pct
