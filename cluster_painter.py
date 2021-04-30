@@ -23,7 +23,7 @@ pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.5
 np.set_printoptions(threshold=sys.maxsize)
 OFFSET = 15
-RANDOM_RANGE = 50
+RANDOM_RANGE = 15
 
 BLACK_LISTED_COLORS = {
     0x010101,
