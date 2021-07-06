@@ -109,7 +109,7 @@ class ClusterPainter:
             return
         print('SET CONTINUE BUTTON')
         submit_button = pyautogui.locateOnScreen(
-            'ui_targets/submit_button_smaller.png', confidence=0.5)
+            'ui_targets/submit_button_new.png', confidence=0.5)
         if not submit_button:
             raise ValueError('[Submit] Button not found.')
         self.submit_button = pyautogui.center(submit_button)
@@ -388,7 +388,7 @@ class ClusterPainter:
             continue_button = None
             while not continue_button:
                 continue_button = pyautogui.locateOnScreen(
-                    'ui_targets/submit_button_smaller.png', confidence=0.5)
+                    'ui_targets/submit_button_new.png', confidence=0.5)
                 time.sleep(1)
 
         return 'Done!'
